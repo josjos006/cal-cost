@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>成本計算</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+    <script>
+        let text = 'text';
+    </script>
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background-color: #f2f2f2;
+            -webkit-tap-highlight-color: transparent;
+            font-family: "Avenir", Helvetica, Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        span {
+            display: block;
+            width: 100%;
+        }
+
+        #main {
+            margin: 0 auto;
+            max-width: 500px;
+            padding: 10px;
+
+        }
+
+        .panel {
+            background-color: #fff;
+            margin: 15px auto;
+            width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 0 10px 10px rgba(182, 166, 166, 0.1);
+            padding: 10px;
+            max-width: 500px;
+            box-sizing: border-box;
+        }
+
+        label.sale-type {
+            border-radius: 10px;
+            border: #dad9d9 1px solid;
+            padding: 10px 5px;
+            margin: 10px auto;
+            display: block;
+        }
+
+        i.sale-type {
+            background-color: #e6f8fd;
+            border-radius: 5px;
+            padding: 2px;
+        }
+
+        input.price {
+            width: 100px;
+            font-size: 14px;
+        }
+
+        input.quantity {
+            width: 60px;
+            font-size: 14px;
+        }
+        
+        .green{
+            background-color: #e4ffbb;
+        }
+        .red{
+            background-color: #ffc8c8;
+        }
+    </style>
+</head>
+
+<body>
+    <main id="main" ng-app="app" ng-controller="mainCtrl">
+
+        <div class="panel">
+            <div class="cost-panel">
+                <h2>進貨</h2>
+                <div class="cost-input-panel">
+                    每 <input type="number" class="quantity" ng-model="newSet.cost.quantity" min="0"
+                        ng-change="updateNetSetCost()"> 個
+                    <input type="number" class="price" ng-model="newSet.cost.price" min="1"
+                        ng-change="updateNetSetCost()"> 元。
+                </div>
+                <p>進貨數量: <input type="number" class="quantity" ng-model="newSet.inventory" min="0"
+                        ng-change="calMaxSaleQuantity()"> 個</p>
+                <p>成本單價: {{ newSet.cost.unitPrice | currency }} 元/個。</p>
+                <p>
+                    當前總成本: {{ newSet.cost.unitPrice * newSet.inventory | currency }} 元。
+                    （= {{ newSet.cost.unitPrice | currency }} * {{ newSet.inventory | number }}）
+                </p>
+            </div>
+            <hr>
+            <div class="sale-panel">
+                <h2>銷售</h2>
+                <div class="sale-input-panel">
+                    <span>
+                        出售單價: <input type="number" class="price" ng-model="newSet.sale.unitPrice" min="0">
+                        元/個。
+                        淨賺 {{ newSet.sale.unitPrice - newSet.cost.unitPrice | currency }} 元
+                    </span>
+                    <h3>策略</h3>
+                    <label class="sale-type">
+                        <input type="radio" ng-value="enum.saleType.price" ng-model="newSet.sale.type"
+                            ng-change="calMaxSaleQuantity()">&nbsp;
+                        每 <input type="number" class="quantity" min="1" ng-model="newSet.sale.byPrice.quantity"
+                            ng-change="calMaxSaleQuantity()"> 個
+                        賣 <input type="number" class="price" min="0" ng-model="newSet.sale.byPrice.price"
+                            ng-change="calMaxSaleQuantity()"> 元。
+                        <br>
+                        <div style="margin-left: 30px;">
+                            淨賺: {{ newSet.sale.byPrice.price - (newSet.sale.byPrice.quantity * newSet.cost.unitPrice) |
+                            currency}}
+                            （ = {{ newSet.sale.byPrice.price | currency }}
+                            - {{ newSet.cost.unitPrice | currency }} * {{ newSet.sale.byPrice.quantity | number }} ）
+                        </div>
+                    </label>
+                    <label class="sale-type">
+                        <input type="radio" ng-value="enum.saleType.free" ng-model="newSet.sale.type"
+                            ng-change="calMaxSaleQuantity()">&nbsp;
+                        每買 <input type="number" class="quantity" min="1" ng-model="newSet.sale.byFree.quantity"
+                            ng-change="calMaxSaleQuantity()"> 個
+                        送 <input type="number" class="quantity" min="0" ng-model="newSet.sale.byFree.forFree"
+                            ng-change="calMaxSaleQuantity()"> 個。
+                        <div style="margin-left: 30px;">
+                            淨賺: {{ newSet.sale.unitPrice * newSet.sale.byFree.quantity - newSet.cost.unitPrice * (
+                            newSet.sale.byFree.quantity + newSet.sale.byFree.forFree) | currency}}
+                            （ = {{ newSet.sale.unitPrice | currency }} * {{ newSet.sale.byFree.quantity | number }}
+                            - {{ newSet.cost.unitPrice | currency }} * ({{ newSet.sale.byFree.quantity | number }} + {{
+                            newSet.sale.byFree.forFree | number }}) ）
+                        </div>
+                    </label>
+                </div>
+            </div>
+        </div>
+        <div class="panel" 
+            ng-class="{green: newSet.expected.netEarnings > 0, red: newSet.expected.netEarnings < 0}">
+            <h2>預期銷售計算</h2>
+            <div>
+                <span>
+                    單一成本價: {{ newSet.cost.unitPrice | currency }} 元/個。
+                </span>
+                <span>
+                    單一售價　: {{ newSet.sale.unitPrice | currency }} 元/個。
+                    淨賺 {{ newSet.sale.unitPrice - newSet.cost.unitPrice | currency }} 元
+                </span>
+                <div>
+                    <span>進貨數量: {{ newSet.inventory | number }} 個。</span>
+                    <span>
+                        已銷售數量: {{ newSet.expected.normalQuantity + newSet.expected.strategyQuantity *
+                        newSet.sale.unitQuantity | number }} 個。
+
+                        （{{newSet.expected.normalQuantity | number}} + {{newSet.expected.strategyQuantity | number}} 組 *
+                        {{newSet.sale.unitQuantity | number}}）
+                    </span>
+                    <span>剩餘數量: {{ newSet.inventory - (newSet.expected.normalQuantity + newSet.expected.strategyQuantity
+                        *
+                        newSet.sale.unitQuantity) | number }} 個。</span>
+                </div>
+                <hr>
+                <div>
+                    <span style="margin-bottom: 5px;">
+                        總銷售額（=總單售 + 總策略）:
+                        <span style="padding-left: 30px;">
+                            {{ newSet.expected.normalQuantity * newSet.sale.unitPrice
+                            + newSet.expected.strategyQuantity * newSet.sale.strategyPrice | currency }} 元。
+
+                            （= {{ newSet.expected.normalQuantity * newSet.sale.unitPrice | currency }}
+                            + {{ newSet.expected.strategyQuantity * newSet.sale.strategyPrice | currency }}）
+                        </span>
+                    </span>
+                    <span style="margin-bottom: 5px;">
+                        總成本: <br>
+                        <span style="padding-left: 30px;">
+                            {{ newSet.cost.unitPrice * newSet.inventory | currency }} 元。
+                        </span>
+                    </span>
+                    <span>
+                        當前收益（= 總銷售額 - 總成本）: {{newSet.expected.netEarnings}}
+                        <span style="padding-left: 30px; font-weight: bolder; font-size: large;">
+                            {{ newSet.expected.netEarnings | currency }} 元。
+
+                            （= {{ newSet.expected.normalQuantity * newSet.sale.unitPrice
+                            + newSet.expected.strategyQuantity * newSet.sale.strategyPrice | currency }}
+                            -
+                            {{ newSet.cost.unitPrice * newSet.inventory | currency }}）
+                        </span>
+                    </span>
+                </div>
+            </div>
+            <hr>
+            <div>
+                <div>
+                    <span>單一售出數量:</span>
+                    <input type="range" ng-model="newSet.expected.normalQuantity" min="0" max="{{ newSet.inventory }}"
+                        ng-change="checkStrategyQuantity()">
+                    <input type="number" class="quantity" ng-model="newSet.expected.normalQuantity" min="0"
+                        max="{{ newSet.inventory }}" ng-change="checkStrategyQuantity()"> 個。
+                        <i>整體佔 {{ newSet.inventory > 0 ? newSet.expected.normalQuantity / newSet.inventory * 100 : 0| number }} %。</i>
+                </div>
+                <div>
+                    <span>
+                        策略售出數量: （策略:
+                        <i class="sale-type" ng-if="newSet.sale.type == enum.saleType.price">
+                            {{newSet.sale.byPrice.quantity}} 個 {{newSet.sale.byPrice.price}}元
+                        </i>
+                        <i class="sale-type" ng-if="newSet.sale.type == enum.saleType.free">
+                            買 {{newSet.sale.byFree.quantity}} 送 {{newSet.sale.byFree.forFree}}
+                        </i>
+                        ）
+                    </span>
+                    <input type="range" ng-model="newSet.expected.strategyQuantity" min="0"
+                        max="{{ newSet.maxStrategyQuantity }}" ng-change="checkNormalQuantity()">
+                    <input type="number" class="quantity" ng-model="newSet.expected.strategyQuantity" min="0"
+                        max="{{ newSet.maxStrategyQuantity }}" ng-change="checkNormalQuantity()"> 組。
+                    <i>共 {{newSet.expected.strategyQuantity * newSet.sale.unitQuantity }} 個。</i>
+                    <i>整體佔 {{ newSet.inventory > 0 ? newSet.expected.strategyQuantity * newSet.sale.unitQuantity / newSet.inventory * 100 : 0| number }} %。</i>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const SALE_TYPE_BY_PRICE = "byPrice";
+        const SALE_TYPE_BY_FREE = "byFree";
+        let appModule = angular.module("app", []);
+        appModule.controller("mainCtrl", function ($scope) {
+            $scope.enum = {
+                saleType: {
+                    price: SALE_TYPE_BY_PRICE,
+                    free: SALE_TYPE_BY_FREE,
+                }
+            }
+            let curSet = {};
+            let allSet = [];
+
+            $scope.newSet = {
+                inventory: 0,
+                maxNormalQuantity: 0,
+                maxStrategyQuantity: 0,
+                cost: {
+                    price: 0,
+                    quantity: 1,
+                    unitPrice: 0,
+                },
+                sale: {
+                    unitPrice: 39,
+                    type: SALE_TYPE_BY_PRICE,
+                    unitQuantity: 0,
+                    netEarnings: 0,
+                    strategyPrice: 0,
+                },
+                expected: {
+                    normalQuantity: 0,
+                    strategyQuantity: 0,
+                    netEarnings: 0,
+                }
+            };
+            $scope.newSet.sale[SALE_TYPE_BY_PRICE] = {
+                quantity: 0,
+                price: 0,
+            }
+            $scope.newSet.sale[SALE_TYPE_BY_FREE] = {
+                quantity: 0,
+                forFree: 0,
+            }
+
+
+            $scope.updateNetSetCost = function () {
+                calCost($scope.newSet.cost);
+            }
+
+            function calCost(cost) {
+                cost.price < 0 ? 0 : cost.price;
+                cost.quantity < 1 ? 1 : cost.quantity;
+                cost.unitPrice = cost.price / cost.quantity;
+                calExpNetEarnings();
+            }
+
+            $scope.calMaxSaleQuantity = function () {
+                let inventory = $scope.newSet.inventory;
+                let saleObj = $scope.newSet.sale;
+                if (saleObj.type == SALE_TYPE_BY_PRICE) {
+                    saleObj.unitQuantity = saleObj[SALE_TYPE_BY_PRICE].quantity;
+                    saleObj.netEarnings = saleObj.byPrice.price - (saleObj.byPrice.quantity * $scope.newSet.cost.unitPrice);
+                    saleObj.strategyPrice = saleObj.byPrice.price;
+                } else if (saleObj.type == SALE_TYPE_BY_FREE) {
+                    let freeObj = saleObj[SALE_TYPE_BY_FREE];
+                    saleObj.unitQuantity = freeObj.quantity + freeObj.forFree;
+                    saleObj.netEarnings = saleObj.unitPrice * saleObj.byFree.quantity - $scope.newSet.cost.unitPrice * (
+                        saleObj.byFree.quantity + saleObj.byFree.forFree);
+                    saleObj.strategyPrice = saleObj.unitPrice * saleObj.byFree.quantity;
+                }
+                let unitQuantity = saleObj.unitQuantity;
+                let expected = $scope.newSet.expected;
+
+                $scope.newSet.maxStrategyQuantity = unitQuantity < 1 ? 0 : Math.floor(inventory / unitQuantity);
+                calExpNetEarnings();
+            }
+
+            $scope.checkNormalQuantity = function () {
+                let inventory = $scope.newSet.inventory;
+                let saleObj = $scope.newSet.sale;
+                let unitQuantity = saleObj.unitQuantity;
+                let expected = $scope.newSet.expected;
+
+                expected.normalQuantity = Math.min(expected.normalQuantity, inventory - (expected.strategyQuantity * unitQuantity));
+                calExpNetEarnings();
+            }
+
+            $scope.checkStrategyQuantity = function () {
+                let inventory = $scope.newSet.inventory;
+                let saleObj = $scope.newSet.sale;
+                let unitQuantity = saleObj.unitQuantity;
+                let expected = $scope.newSet.expected;
+
+                expected.strategyQuantity = Math.min(expected.strategyQuantity, Math.floor((inventory - expected.normalQuantity) / unitQuantity));
+                calExpNetEarnings();
+            }
+
+            function calExpNetEarnings(){
+                let inventory = $scope.newSet.inventory;
+                let saleObj = $scope.newSet.sale;
+                let unitQuantity = saleObj.unitQuantity;
+                let expected = $scope.newSet.expected;
+
+                expected.netEarnings = (expected.normalQuantity * saleObj.unitPrice + expected.strategyQuantity * saleObj.strategyPrice) 
+                                        - ($scope.newSet.cost.unitPrice * $scope.newSet.inventory);
+            }
+
+        });
+
+    </script>
+</body>
+
+</html>
